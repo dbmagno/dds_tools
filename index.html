@@ -137,7 +137,6 @@ function view(v){s.view=v;document.querySelectorAll('.tab').forEach((t,i)=>t.cla
 function selTheme(t){s.theme=t;render()}
 function saveApi(){const v=document.getElementById('apiin')?.value.trim();if(v){s.api=v;localStorage.dds_api=v;s.showApi=false;s.err='';render()}}
 function clearApi(){delete localStorage.dds_api;s.api='';s.showApi=true;render()}
-
 function genFromCal(theme){s.theme=theme;s.view='gen';document.querySelectorAll('.tab').forEach((t,i)=>t.classList.toggle('active',i===0));render();setTimeout(()=>gen(),300)}
 
 async function gen(){
@@ -150,18 +149,7 @@ if(s.theme==='custom'&&!s.custom.trim()){s.err='Digite o tema!';render();return}
 s.load=true;s.gen=[];s.err='';render();
 const prev=s.hist.slice(-5).map(h=>h.title).join('", "');
 
-try{
-const r=await fetch('https://api.anthropic.com/v1/messages',{
-method:'POST',
-headers:{
-'Content-Type':'application/json',
-'x-api-key':s.api,
-'anthropic-version':'2023-06-01'
-},
-body:JSON.stringify({
-model:'claude-sonnet-4-20250514',
-max_tokens:800,
-messages:[{role:'user',content:`Você é o gerador de DDS da Tools (Santander).
+const prompt=`Você é o gerador de DDS da Tools (Santander).
 
 TEMA: ${desc}
 ${prev?`NÃO repita: "${prev}"`:''}
@@ -187,14 +175,19 @@ Se usou, lava. Convivência começa aí.
 FECHAMENTO: Deixa limpo. Simples assim.
 GIF: pessoa lavando louça feliz
 
-Crie agora:`}]
-})
+Crie agora:`;
+
+try{
+const r=await fetch('/api/generate',{
+method:'POST',
+headers:{'Content-Type':'application/json'},
+body:JSON.stringify({apiKey:s.api,prompt})
 });
 
 const data=await r.json();
 
 if(!r.ok){
-s.err=`API Error: ${data.error?.message||r.status}`;
+s.err=`Erro: ${data.error?.message||data.error||'Falha na API'}`;
 s.load=false;render();return;
 }
 
@@ -224,7 +217,7 @@ ts:new Date().toISOString()
 s.gen=[dds];
 s.hist.push(dds);
 }catch(e){
-s.err=`Erro: ${e.message}. Verifique sua API Key em console.anthropic.com`;
+s.err=`Erro de conexão: ${e.message}`;
 }
 
 s.load=false;render();
