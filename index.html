@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DDS Tools - Santander</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:system-ui;background:#1a1a2e;color:#fff;padding:16px}
+.container{max-width:600px;margin:0 auto}
+h1{text-align:center;margin-bottom:8px}
+.subtitle{text-align:center;color:#a78bfa;margin-bottom:24px;font-size:14px}
+.tabs{display:flex;gap:8px;margin-bottom:16px}
+.tab{flex:1;padding:12px;background:#2d2d44;border:none;border-radius:8px;color:#fff;font-weight:600;cursor:pointer}
+.tab.active{background:linear-gradient(135deg,#8b5cf6,#ec4899)}
+.card{background:#2d2d44;padding:16px;border-radius:12px;margin-bottom:16px}
+.btn{width:100%;padding:14px;border:none;border-radius:8px;font-weight:600;font-size:16px;cursor:pointer;margin-top:8px}
+.btn-primary{background:linear-gradient(135deg,#8b5cf6,#ec4899);color:#fff}
+.btn-primary:disabled{background:#666;cursor:not-allowed}
+.btn-secondary{background:#475569;color:#fff}
+.btn-success{background:#10b981;color:#fff}
+.theme-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+.theme-btn{padding:12px;background:#1a1a2e;border:2px solid #3d3d5c;border-radius:8px;color:#fff;font-weight:600;cursor:pointer}
+.theme-btn.active{border-color:#8b5cf6;background:#3d3d5c}
+input,textarea{width:100%;padding:12px;background:#1a1a2e;border:1px solid #3d3d5c;border-radius:8px;color:#fff;font-size:16px}
+input::placeholder,textarea::placeholder{color:#888}
+.dds-card{background:#fff;color:#000;border-radius:12px;margin-bottom:16px;overflow:hidden}
+.dds-header{background:linear-gradient(135deg,#8b5cf6,#ec4899);padding:12px;color:#fff;font-weight:600}
+.dds-body{padding:20px}
+.dds-title{font-size:22px;font-weight:700;margin-bottom:12px}
+.dds-text{font-size:16px;line-height:1.5;margin-bottom:12px;white-space:pre-wrap}
+.dds-closing{font-size:16px;font-weight:600;color:#8b5cf6;margin-bottom:12px}
+.dds-gif{background:#f3f4f6;padding:10px;border-radius:6px;font-size:14px;margin-bottom:12px}
+.btn-group{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.alert{padding:12px;border-radius:8px;margin-bottom:16px}
+.alert-warning{background:#f59e0b;color:#000}
+.alert-success{background:#10b981}
+.alert-error{background:#ef4444}
+.loading{text-align:center;padding:40px}
+.spinner{border:3px solid #3d3d5c;border-top:3px solid #8b5cf6;border-radius:50%;width:40px;height:40px;animation:spin 1s linear infinite;margin:0 auto 12px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.empty{text-align:center;padding:60px 20px;color:#888}
+.history-item{background:#2d2d44;padding:16px;border-radius:8px;margin-bottom:12px}
+.history-date{font-size:12px;color:#888;margin-bottom:8px}
+.history-title{font-weight:700;margin-bottom:8px}
+.cal-item{background:#1a1a2e;padding:12px;border-radius:6px;margin-bottom:6px;display:flex;gap:12px;align-items:center;cursor:pointer;transition:all 0.2s}
+.cal-item:hover{background:#2d2d44}
+.cal-day{background:#8b5cf6;width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;flex-shrink:0}
+</style>
+</head>
+<body>
+<div class="container">
+<h1>✨ Gerador DDS</h1>
+<div class="subtitle">Tools - Grupo Santander</div>
+<div class="tabs">
+<button class="tab active" onclick="view('gen')">Gerador</button>
+<button class="tab" onclick="view('hist')">Histórico (<span id="cnt">0</span>)</button>
+<button class="tab" onclick="view('cal')">30 Dias</button>
+</div>
+<div id="api"></div>
+<div id="alert"></div>
+<div id="content"></div>
+</div>
+
+<script>
+let s={api:localStorage.dds_api||'',showApi:!localStorage.dds_api,theme:'random',custom:'',gen:[],hist:[],load:false,view:'gen',err:''};
+
+const themes={
+random:'🎲 Aleatório',custom:'✍️ Tema Livre',seg:'🦺 Segurança',esp:'🏢 Espaços',
+inc:'♿ Inclusão',eti:'⚖️ Ética',esg:'🌱 ESG',cul:'🎯 Cultura',bem:'💚 Bem-estar',
+dig:'🔐 Digital',tec:'📱 Tech',pro:'⚡ Produtividade',mob:'🚗 Mobilidade'
+};
+
+function render(){
+document.getElementById('api').innerHTML=s.showApi?
+`<div class="card alert-warning"><strong>🔑 API Key</strong><br><small>console.anthropic.com → API Keys</small><input id="apiin" value="${s.api}" placeholder="sk-ant-api03-..."><button class="btn btn-primary" onclick="saveApi()">Salvar</button></div>`:
+`<div class="card alert-success">✓ API Configurada <button class="btn btn-secondary" onclick="clearApi()">Trocar</button></div>`;
+document.getElementById('alert').innerHTML=s.err?`<div class="card alert-error">⚠️ ${s.err}</div>`:'';
+document.getElementById('cnt').textContent=s.hist.length;
+if(s.view==='gen')renderGen();
+else if(s.view==='hist')renderHist();
+else renderCal();
+}
+
+function renderGen(){
+let html=`<div class="card"><strong>📂 Tema</strong><div class="theme-grid">`;
+for(let k in themes)html+=`<button class="theme-btn ${s.theme===k?'active':''}" onclick="selTheme('${k}')">${themes[k]}</button>`;
+html+=`</div>`;
+if(s.theme==='custom')html+=`<input id="custin" value="${s.custom}" placeholder="Ex: uso de EPIs..." oninput="s.custom=this.value">`;
+html+=`<button class="btn btn-primary" onclick="gen()" ${s.load||!s.api?'disabled':''}>${s.load?'⏳ Gerando...':'🚀 Gerar DDS'}</button></div>`;
+if(s.load)html+=`<div class="loading"><div class="spinner"></div><p>Aguarde...</p></div>`;
+s.gen.forEach(d=>{
+html+=`<div class="dds-card"><div class="dds-header">${themes[s.theme]||'DDS'}</div><div class="dds-body">
+<div class="dds-title">${d.title}</div><div class="dds-text">${d.text}</div>
+<div class="dds-closing">${d.closing}</div><div class="dds-gif">👉 <strong>GIF:</strong> ${d.gif}</div>
+<div class="btn-group">
+<button class="btn btn-secondary" onclick='copy(${JSON.stringify(d)})'>📋 Copiar</button>
+<button class="btn btn-success" onclick='email(${JSON.stringify(d)})'>📧 Enviar</button>
+</div></div></div>`;
+});
+if(!s.load&&!s.gen.length)html+=`<div class="empty"><div style="font-size:48px;margin-bottom:12px">✨</div><p>Escolha um tema</p></div>`;
+document.getElementById('content').innerHTML=html;
+}
+
+function renderHist(){
+if(!s.hist.length){
+document.getElementById('content').innerHTML=`<div class="empty"><div style="font-size:48px;margin-bottom:12px">📊</div><p>Nenhum DDS ainda</p></div>`;
+return;
+}
+let html=`<button class="btn btn-primary" onclick="exp()">💾 Exportar (${s.hist.length})</button>`;
+[...s.hist].reverse().forEach(d=>{
+html+=`<div class="history-item"><div class="history-date">${new Date(d.ts).toLocaleString('pt-BR')}</div>
+<div class="history-title">${d.title}</div><div class="btn-group">
+<button class="btn btn-secondary" onclick='copy(${JSON.stringify(d)})'>📋</button>
+<button class="btn btn-success" onclick='email(${JSON.stringify(d)})'>📧</button>
+</div></div>`;
+});
+document.getElementById('content').innerHTML=html;
+}
+
+function renderCal(){
+const cal=[[1,'cul','Cliente'],[2,'esp','Elevador'],[3,'seg','Ergonomia'],[4,'inc','PCD'],[5,'esg','Papel'],
+[6,'tec','Celular'],[7,'bem','Pausas'],[8,'dig','Senhas'],[9,'esp','Cozinha'],[10,'cul','Equipe'],
+[11,'eti','Ética'],[12,'pro','Email'],[13,'seg','Saídas'],[14,'inc','Diversidade'],[15,'tec','Mudo'],
+[16,'esp','Bebedouro'],[17,'cul','Mudança'],[18,'esg','Canecas'],[19,'bem','Mental'],[20,'dig','Phishing'],
+[21,'mob','Vagas'],[22,'esp','Calls'],[23,'inc','Inclusão'],[24,'cul','Rapidez'],[25,'seg','Prevenção'],
+[26,'tec','Tela'],[27,'pro','Foco'],[28,'eti','Transparência'],[29,'esp','Banheiro'],[30,'cul','Balanço']];
+let html=`<div class="card"><strong>📅 Calendário 30 Dias</strong><p style="font-size:13px;color:#888;margin:8px 0">Clique para gerar o DDS do dia</p>`;
+cal.forEach(([d,t,n])=>html+=`<div class="cal-item" onclick="genFromCal('${t}')">
+<div class="cal-day">${d}</div><div style="flex:1"><div style="font-weight:600">${themes[t]}</div>
+<div style="font-size:13px;color:#888">${n}</div></div><div style="color:#8b5cf6;font-size:20px">→</div></div>`);
+html+=`</div>`;
+document.getElementById('content').innerHTML=html;
+}
+
+function view(v){s.view=v;document.querySelectorAll('.tab').forEach((t,i)=>t.classList.toggle('active',['gen','hist','cal'][i]===v));render()}
+function selTheme(t){s.theme=t;render()}
+function saveApi(){const v=document.getElementById('apiin')?.value.trim();if(v){s.api=v;localStorage.dds_api=v;s.showApi=false;s.err='';render()}}
+function clearApi(){delete localStorage.dds_api;s.api='';s.showApi=true;render()}
+
+function genFromCal(theme){s.theme=theme;s.view='gen';document.querySelectorAll('.tab').forEach((t,i)=>t.classList.toggle('active',i===0));render();setTimeout(()=>gen(),300)}
+
+async function gen(){
+if(!s.api){s.err='Configure API!';s.showApi=true;render();return}
+let desc={random:'qualquer tema relevante',custom:s.custom,seg:'segurança do trabalho',esp:'espaços compartilhados',
+inc:'inclusão e respeito',eti:'ética',esg:'sustentabilidade',cul:'cultura Tools',bem:'bem-estar',
+dig:'segurança digital',tec:'tecnologia',pro:'produtividade',mob:'mobilidade'}[s.theme];
+if(s.theme==='custom'&&!s.custom.trim()){s.err='Digite o tema!';render();return}
+
+s.load=true;s.gen=[];s.err='';render();
+const prev=s.hist.slice(-5).map(h=>h.title).join('", "');
+
+try{
+const r=await fetch('https://api.anthropic.com/v1/messages',{
+method:'POST',
+headers:{'Content-Type':'application/json','x-api-key':s.api,'anthropic-version':'2023-06-01'},
+body:JSON.stringify({
+model:'claude-sonnet-4-20250514',
+max_tokens:800,
+messages:[{role:'user',content:`Você é o gerador de DDS da Tools (Santander).
+
+TEMA: ${desc}
+${prev?`NÃO repita: "${prev}"`:''}
+
+Crie 1 DDS CURTO seguindo este formato:
+
+TÍTULO: (5 palavras + emoji)
+TEXTO: (máximo 3 linhas curtas, tom coloquial, situação real)
+FECHAMENTO: (1 frase direta)
+GIF: (descrição simples)
+
+REGRAS:
+- Tom LEVE e COLOQUIAL
+- CURTO (máx 280 caracteres no texto)
+- Situação REAL do dia a dia
+- SEM linguagem corporativa rebuscada
+- DIRETO AO PONTO
+
+EXEMPLO BOM:
+TÍTULO: 🍽️ Cozinha não tem mãe
+TEXTO: Xícara na pia, prato sujo, marmita esquecida.
+Se usou, lava. Convivência começa aí.
+FECHAMENTO: Deixa limpo. Simples assim.
+GIF: pessoa lavando louça feliz
+
+Crie agora:`}]
+})
+});
+
+if(!r.ok)throw new Error('Erro na API');
+const data=await r.json();
+const txt=data.content[0].text;
+
+const lines=txt.split('\n').filter(l=>l.trim());
+let title='',text=[],closing='',gif='';
+
+lines.forEach(l=>{
+const low=l.toLowerCase();
+if(low.includes('título:')||low.includes('titulo:'))title=l.split(':').slice(1).join(':').trim();
+else if(low.includes('texto:')){}
+else if(low.includes('fechamento:'))closing=l.split(':').slice(1).join(':').trim();
+else if(low.includes('gif:'))gif=l.split(':').slice(1).join(':').trim();
+else if(!title){}
+else if(!closing&&!low.includes('gif:'))text.push(l.trim());
+});
+
+const dds={
+id:Date.now(),
+title:title||lines[0]||'✨ DDS',
+text:text.join('\n')||lines.slice(1,4).join('\n'),
+closing:closing||'Vamos juntos!',
+gif:gif||'celebração',
+ts:new Date().toISOString()
+};
+
+s.gen=[dds];
+s.hist.push(dds);
+}catch(e){s.err=e.message}
+
+s.load=false;render();
+}
+
+function copy(d){
+navigator.clipboard.writeText(`${d.title}\n\n${d.text}\n\n${d.closing}\n\n👉 GIF: ${d.gif}`);
+alert('✅ Copiado!');
+}
+
+function email(d){
+const subj=encodeURIComponent(`DDS Tools - ${d.title}`);
+const body=encodeURIComponent(`${d.title}\n\n${d.text}\n\n${d.closing}\n\n👉 GIF: ${d.gif}\n\n---\nGerado pelo DDS Tools - Santander`);
+window.location.href=`mailto:diego.magno@toolsds.com?subject=${subj}&body=${body}`;
+}
+
+function exp(){
+const t=s.hist.map((d,i)=>`#${i+1} ${new Date(d.ts).toLocaleString()}\n${d.title}\n${d.text}\n${d.closing}\nGIF: ${d.gif}\n${'='.repeat(50)}\n`).join('\n');
+const b=new Blob([t],{type:'text/plain'});
+const a=document.createElement('a');
+a.href=URL.createObjectURL(b);
+a.download=`dds-${Date.now()}.txt`;
+a.click();
+}
+
+render();
+</script>
+</body>
+</html>
