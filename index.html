@@ -153,7 +153,11 @@ const prev=s.hist.slice(-5).map(h=>h.title).join('", "');
 try{
 const r=await fetch('https://api.anthropic.com/v1/messages',{
 method:'POST',
-headers:{'Content-Type':'application/json','x-api-key':s.api,'anthropic-version':'2023-06-01'},
+headers:{
+'Content-Type':'application/json',
+'x-api-key':s.api,
+'anthropic-version':'2023-06-01'
+},
 body:JSON.stringify({
 model:'claude-sonnet-4-20250514',
 max_tokens:800,
@@ -187,10 +191,14 @@ Crie agora:`}]
 })
 });
 
-if(!r.ok)throw new Error('Erro na API');
 const data=await r.json();
-const txt=data.content[0].text;
 
+if(!r.ok){
+s.err=`API Error: ${data.error?.message||r.status}`;
+s.load=false;render();return;
+}
+
+const txt=data.content[0].text;
 const lines=txt.split('\n').filter(l=>l.trim());
 let title='',text=[],closing='',gif='';
 
@@ -215,7 +223,9 @@ ts:new Date().toISOString()
 
 s.gen=[dds];
 s.hist.push(dds);
-}catch(e){s.err=e.message}
+}catch(e){
+s.err=`Erro: ${e.message}. Verifique sua API Key em console.anthropic.com`;
+}
 
 s.load=false;render();
 }
